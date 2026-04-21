@@ -1,0 +1,113 @@
+name: API Test Suite CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        env: [dev, prod]
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest-html pytest-junit-xml
+
+      - name: Start Docker container
+        run: |
+          docker run -d -p 3000:3000 --name sdet-test-app ghcr.io/danielsilva-loanpro/sdet-interview-challenge:latest
+          # Wait for the container to be ready
+          sleep 10
+          # Verify the container is running
+          docker ps
+          # Health check - wait until the API is responsive
+          for i in {1..30}; do
+            if curl -s http://localhost:3000/dev/users > /dev/null 2>&1; then
+              echo "API is ready!"
+              break
+            fi
+            echo "Waiting for API to be ready... ($i/30)"
+            sleep 2
+          done
+
+      - name: Run tests (${{ matrix.env }})
+        run: |
+          mkdir -p reports
+          pytest tests/ --env=${{ matrix.env }} \
+            --html=reports/report-${{ matrix.env }}.html \
+            --junitxml=reports/junit-${{ matrix.env }}.xml \
+            --tb=short \
+            -v
+
+      - name: Stop Docker container
+        run: |
+          docker stop sdet-test-app
+          docker rm sdet-test-app
+        if: always()
+
+      - name: Upload test report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-report-${{ matrix.env }}
+          path: |
+            reports/report-${{ matrix.env }}.html
+            reports/junit-${{ matrix.env }}.xml
+
+  publish-reports:
+    needs: test
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all test reports
+        uses: actions/download-artifact@v4
+        with:
+          path: reports
+
+      - name: List reports
+        run: |
+          echo "=== Test Reports ==="
+          find reports -type f \( -name "*.html" -o -name "*.xml" \) | sort
+          echo "===================="
+
+      - name: Publish test summary
+        run: |
+          echo "## Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          for dir in reports/test-report-*; do
+            if [ -d "$dir" ]; then
+              for xml in "$dir"/junit-*.xml; do
+                if [ -f "$xml" ]; then
+                  env_name=$(basename "$xml" | sed -E 's/junit-(.+)\.xml/\1/')
+                  tests=$(grep -oP 'tests="\K[0-9]+' "$xml" 2>/dev/null | head -1 || echo "N/A")
+                  failures=$(grep -oP 'failures="\K[0-9]+' "$xml" 2>/dev/null | head -1 || echo "0")
+                  errors=$(grep -oP 'errors="\K[0-9]+' "$xml" 2>/dev/null | head -1 || echo "0")
+                  echo "### Environment: $env_name" >> $GITHUB_STEP_SUMMARY
+                  echo "- Tests: $tests" >> $GITHUB_STEP_SUMMARY
+                  echo "- Failures: $failures" >> $GITHUB_STEP_SUMMARY
+                  echo "- Errors: $errors" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                fi
+              done
+            fi
+          done
