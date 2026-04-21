@@ -5,5 +5,5 @@ def random_user():
     return {
         "name": fake.name(),
         "email": fake.email(),
-        "age": 10
+        "age": fake.random_int(min=18, max=80)
     }
