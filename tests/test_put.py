@@ -147,44 +147,157 @@ def test_create_valid_user_update_data_with_existing_user_email(env_endpoint, re
     to match the second user's email. This tests how the API handles potential
     email conflicts during updates.
     
-    Note: The current API behavior allows this operation (returns 200), which
-    may result in the first user's data being updated with the second user's email.
-    This could be a potential data integrity issue depending on requirements.
-    
     Expected Behavior:
     - Both users are created successfully
-    - PUT request returns 200 (OK) with updated data
+    - PUT request returns 409 (Conflict) - duplicate email not allowed
     """
 
     user_list = []
 
+    # Create first user (User A)
+    body_data_a, json_body_a = generate_random_user()
+    response = requests.post(env_endpoint, json.dumps(body_data_a))
+    logging.log(logging.INFO, "user A created: ")
+    logging.log(logging.INFO, body_data_a["email"])
+    assert response.status_code == 201
+    user_list.append(body_data_a)
+
+    # Create second user (User B)
+    body_data_b, json_body_b = generate_random_user()
+    response = requests.post(env_endpoint, json.dumps(body_data_b))
+    logging.log(logging.INFO, "user B created: ")
+    logging.log(logging.INFO, body_data_b["email"])
+    assert response.status_code == 201
+    user_list.append(body_data_b)
+
+    # Update User A's email to match User B's email (should fail with 409)
+    body_data_a["email"] = body_data_b["email"]
+
+    response = requests.put(env_endpoint + "/" + body_data_a["email"], json.dumps(body_data_a))
+
+    assert response.status_code == 409
+
+
+def test_update_user_age_below_minimum(env_endpoint, request_headers):
+    """
+    Test that updating a user with age below minimum (1) returns an error.
+    
+    This test verifies that the API validates the age field minimum boundary during update.
+    
+    Expected Behavior:
+    - Status code: 400 (Bad Request)
+    """
+    # Create a user first
     body_data, json_body = generate_random_user()
-
-    response = requests.post(env_endpoint, json_body)
-    logging.log(logging.INFO, "user created: ")
-    logging.log(logging.INFO, body_data["email"])
+    response = requests.post(env_endpoint, json.dumps(body_data))
     assert response.status_code == 201
-    user_list.append(body_data)
 
-    response = requests.get(env_endpoint)
+    # Attempt to update with age below minimum
+    body_data["age"] = 0
+    response = requests.put(env_endpoint + "/" + body_data["email"], json.dumps(body_data))
 
-    assert response.status_code == 200
-    assert response.json() == user_list
-    assert len(response.json()) == 1
+    assert response.status_code == 400
 
-    # Create second user
-    body_data_update, json_body_update = generate_random_user()
 
-    response = requests.post(env_endpoint, json_body_update)
-    logging.log(logging.INFO, "user created: ")
-    logging.log(logging.INFO, body_data["email"])
+def test_update_user_age_above_maximum(env_endpoint, request_headers):
+    """
+    Test that updating a user with age above maximum (150) returns an error.
+    
+    This test verifies that the API validates the age field maximum boundary during update.
+    
+    Expected Behavior:
+    - Status code: 400 (Bad Request)
+    """
+    # Create a user first
+    body_data, json_body = generate_random_user()
+    response = requests.post(env_endpoint, json.dumps(body_data))
     assert response.status_code == 201
-    user_list.append(body_data)
 
-    # Update first user's email to match second user's email
-    body_data_update["email"] = body_data["email"]
+    # Attempt to update with age above maximum
+    body_data["age"] = 151
+    response = requests.put(env_endpoint + "/" + body_data["email"], json.dumps(body_data))
 
-    response = requests.put(env_endpoint + "/" + body_data["email"], json.dumps(body_data_update))
+    assert response.status_code == 400
 
-    assert response.status_code == 200
-    assert response.json() == body_data_update
+
+def test_update_user_negative_age(env_endpoint, request_headers):
+    """
+    Test that updating a user with negative age returns an error.
+    
+    This test verifies that the API rejects negative age values during update.
+    
+    Expected Behavior:
+    - Status code: 400 (Bad Request)
+    """
+    # Create a user first
+    body_data, json_body = generate_random_user()
+    response = requests.post(env_endpoint, json.dumps(body_data))
+    assert response.status_code == 201
+
+    # Attempt to update with negative age
+    body_data["age"] = -5
+    response = requests.put(env_endpoint + "/" + body_data["email"], json.dumps(body_data))
+
+    assert response.status_code == 400
+
+
+def test_update_user_invalid_email_format(env_endpoint, request_headers):
+    """
+    Test that updating a user with invalid email format returns an error.
+    
+    This test verifies that the API validates the email field format during update.
+    
+    Expected Behavior:
+    - Status code: 400 (Bad Request)
+    """
+    # Create a user first
+    body_data, json_body = generate_random_user()
+    response = requests.post(env_endpoint, json.dumps(body_data))
+    assert response.status_code == 201
+
+    # Attempt to update with invalid email format
+    body_data["email"] = "invalid-email"
+    response = requests.put(env_endpoint + "/" + body_data["email"], json.dumps(body_data))
+
+    assert response.status_code == 400
+
+
+def test_update_user_empty_email(env_endpoint, request_headers):
+    """
+    Test that updating a user with empty email returns an error.
+    
+    This test verifies that the API rejects empty email strings during update.
+    
+    Expected Behavior:
+    - Status code: 400 (Bad Request)
+    """
+    # Create a user first
+    body_data, json_body = generate_random_user()
+    response = requests.post(env_endpoint, json.dumps(body_data))
+    assert response.status_code == 201
+
+    # Attempt to update with empty email
+    body_data["email"] = ""
+    response = requests.put(env_endpoint + "/" + body_data["email"], json.dumps(body_data))
+
+    assert response.status_code == 400
+
+
+def test_update_user_empty_body(env_endpoint, request_headers):
+    """
+    Test that updating a user with empty body returns an error.
+    
+    This test verifies that the API rejects empty request bodies during update.
+    
+    Expected Behavior:
+    - Status code: 400 (Bad Request)
+    """
+    # Create a user first
+    body_data, json_body = generate_random_user()
+    response = requests.post(env_endpoint, json.dumps(body_data))
+    assert response.status_code == 201
+
+    # Attempt to update with empty body
+    response = requests.put(env_endpoint + "/" + body_data["email"], data='{}')
+
+    assert response.status_code == 400
