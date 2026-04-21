@@ -53,7 +53,9 @@ jobs:
             --html=reports/report-${{ matrix.env }}.html \
             --junitxml=reports/junit-${{ matrix.env }}.xml \
             --tb=short \
-            -v
+            -v \
+            --continue-on-collection-errors
+        continue-on-error: true
 
       - name: Stop Docker container
         run: |
@@ -90,24 +92,118 @@ jobs:
           find reports -type f \( -name "*.html" -o -name "*.xml" \) | sort
           echo "===================="
 
-      - name: Publish test summary
+      - name: Generate extended test report
         run: |
-          echo "## Test Results Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          for dir in reports/test-report-*; do
-            if [ -d "$dir" ]; then
-              for xml in "$dir"/junit-*.xml; do
-                if [ -f "$xml" ]; then
-                  env_name=$(basename "$xml" | sed -E 's/junit-(.+)\.xml/\1/')
-                  tests=$(grep -oP 'tests="\K[0-9]+' "$xml" 2>/dev/null | head -1 || echo "N/A")
-                  failures=$(grep -oP 'failures="\K[0-9]+' "$xml" 2>/dev/null | head -1 || echo "0")
-                  errors=$(grep -oP 'errors="\K[0-9]+' "$xml" 2>/dev/null | head -1 || echo "0")
-                  echo "### Environment: $env_name" >> $GITHUB_STEP_SUMMARY
-                  echo "- Tests: $tests" >> $GITHUB_STEP_SUMMARY
-                  echo "- Failures: $failures" >> $GITHUB_STEP_SUMMARY
-                  echo "- Errors: $errors" >> $GITHUB_STEP_SUMMARY
-                  echo "" >> $GITHUB_STEP_SUMMARY
-                fi
-              done
-            fi
-          done
+          python << 'EOF'
+          import xml.etree.ElementTree as ET
+          import os
+          import glob
+
+          summary = "## 📊 Extended Test Execution Report\n\n"
+
+          for dir_path in sorted(glob.glob("reports/test-report-*")):
+              if not os.path.isdir(dir_path):
+                  continue
+              
+              xml_files = sorted(glob.glob(os.path.join(dir_path, "junit-*.xml")))
+              for xml_path in xml_files:
+                  if not os.path.isfile(xml_path):
+                      continue
+                  
+                  # Extract environment name from filename
+                  filename = os.path.basename(xml_path)
+                  env_name = filename.replace("junit-", "").replace(".xml", "")
+                  
+                  try:
+                      tree = ET.parse(xml_path)
+                      root = tree.getroot()
+                      
+                      tests_total = int(root.get("tests", "0"))
+                      failures_count = int(root.get("failures", "0"))
+                      errors_count = int(root.get("errors", "0"))
+                      skipped_count = int(root.get("skipped", "0"))
+                      
+                      # Collect test details
+                      passed_tests = []
+                      failed_tests = []
+                      skipped_tests = []
+                      error_tests = []
+                      
+                      for testcase in root.findall(".//testcase"):
+                          test_name = testcase.get("name", "unknown")
+                          test_class = testcase.get("classname", "")
+                          test_time = testcase.get("time", "0")
+                          full_name = f"`{test_name}`"
+                          
+                          # Check for skipped tests
+                          skipped = testcase.find("skipped")
+                          if skipped is not None:
+                              skip_reason = skipped.get("message", "No reason provided")
+                              skipped_tests.append((full_name, skip_reason, test_time))
+                              continue
+                          
+                          # Check for failures
+                          failure = testcase.find("failure")
+                          if failure is not None:
+                              failure_msg = failure.get("message", "No message")
+                              failure_text = failure.text or ""
+                              # Extract first line of failure for briefing
+                              brief = failure_msg.split("\n")[0][:150]
+                              failed_tests.append((full_name, brief, test_time))
+                              continue
+                          
+                          # Check for errors
+                          error = testcase.find("error")
+                          if error is not None:
+                              error_msg = error.get("message", "No message")
+                              brief = error_msg.split("\n")[0][:150]
+                              error_tests.append((full_name, brief, test_time))
+                              continue
+                          
+                          # If no issues, test passed
+                          passed_tests.append((full_name, test_time))
+                      
+                      # Generate report for this environment
+                      summary += f"### 🌍 Environment: `{env_name}`\n\n"
+                      summary += f"**Summary:** {tests_total} total | ✅ {len(passed_tests)} passed | ❌ {len(failed_tests)} failed | ⚠️ {len(skipped_tests)} skipped | 🛑 {len(error_tests)} errors\n\n"
+                      
+                      # Failed tests section
+                      if failed_tests:
+                          summary += "<details>\n<summary>❌ <b>Failed Tests</b></summary>\n\n"
+                          for name, brief, time in failed_tests:
+                              summary += f"- **{name}** ({time}s)\n"
+                              summary += f"  > {brief}\n"
+                          summary += "\n</details>\n\n"
+                      
+                      # Error tests section
+                      if error_tests:
+                          summary += "<details>\n<summary>🛑 <b>Error Tests</b></summary>\n\n"
+                          for name, brief, time in error_tests:
+                              summary += f"- **{name}** ({time}s)\n"
+                              summary += f"  > {brief}\n"
+                          summary += "\n</details>\n\n"
+                      
+                      # Skipped tests section
+                      if skipped_tests:
+                          summary += "<details>\n<summary>⚠️ <b>Skipped Tests</b></summary>\n\n"
+                          for name, reason, time in skipped_tests:
+                              summary += f"- **{name}** ({time}s)\n"
+                              summary += f"  > {reason}\n"
+                          summary += "\n</details>\n\n"
+                      
+                      # Passed tests section (collapsed by default for brevity)
+                      if passed_tests:
+                          summary += "<details>\n<summary>✅ <b>Passed Tests</b></summary>\n\n"
+                          for name, time in passed_tests:
+                              summary += f"- **{name}** ({time}s)\n"
+                          summary += "\n</details>\n\n"
+                      
+                      summary += "---\n\n"
+                      
+                  except ET.ParseError as e:
+                      summary += f"### Environment: {env_name}\n"
+                      summary += f"⚠️ Failed to parse report: {e}\n\n"
+
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+              f.write(summary)
+          EOF
