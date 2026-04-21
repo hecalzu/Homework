@@ -31,7 +31,7 @@ jobs:
 
       - name: Start Docker container
         run: |
-          docker run -p 3000:3000 ghcr.io/danielsilva-loanpro/sdet-interview-challenge:latest
+          docker run -p 3000:3000 -d ghcr.io/danielsilva-loanpro/sdet-interview-challenge:latest
           # Wait for the container to be ready
           sleep 10
           # Verify the container is running
