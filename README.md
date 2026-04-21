@@ -28,8 +28,7 @@ Homework/
 │       └── ci.yml             # GitHub Actions CI/CD pipeline
 ├── sdet_challenge_api.yml     # OpenAPI 3.0 specification
 ├── pytest.ini                 # Pytest configuration
-├── requirements.txt           # Python dependencies
-├── create_and_delete_user.py  # Utility script for user management
+├── requirements.txt.          # Utility script for user management
 ├── TestCases.MD               # Detailed test case documentation
 └── Bugs.MD                    # Bug tracking and known issues
 ```
@@ -177,11 +176,6 @@ The test suite uses the following configuration:
 - **[TestCases.MD](TestCases.MD)**: Detailed test case descriptions and scenarios
 - **[Bugs.MD](Bugs.MD)**: Known issues and bug reports
 - **[sdet_challenge_api.yml](sdet_challenge_api.yml)**: Complete OpenAPI 3.0 specification
-
-## 🔧 Utility Scripts
-
-### create_and_delete_user.py
-A standalone script for manually creating and deleting users for testing purposes.
 
 ## 🤝 Contributing
 
