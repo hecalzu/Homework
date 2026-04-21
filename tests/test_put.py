@@ -7,7 +7,7 @@ from tests.util.user_generator import generate_random_user
 import json
 
 # Test creating a new valid user and update data
-def test_create_valid_user_update_data(env_endpoint, test_context_users_teardown):
+def test_create_valid_user_update_data(env_endpoint, test_context_users_teardown,request_headers):
 
     user_list = []
 
@@ -36,7 +36,7 @@ def test_create_valid_user_update_data(env_endpoint, test_context_users_teardown
 
 
     # Test creating a new valid user and updating with malformed json body
-def test_create_valid_user_update_invalid_json(env_endpoint, test_context_users_teardown):
+def test_create_valid_user_update_invalid_json(env_endpoint, test_context_users_teardown,request_headers):
 
     user_list = []
 
@@ -61,7 +61,7 @@ def test_create_valid_user_update_invalid_json(env_endpoint, test_context_users_
     assert response.status_code == 400
 
 # Test creating a new valid user and try to update data with wrong email
-def test_create_valid_user_update_data_wrong_email(env_endpoint, test_context_users_teardown):
+def test_create_valid_user_update_data_wrong_email(env_endpoint, test_context_users_teardown,request_headers):
 
     user_list = []
 
@@ -88,7 +88,7 @@ def test_create_valid_user_update_data_wrong_email(env_endpoint, test_context_us
     assert response.status_code == 404
 
 # Test creating a new valid user and update data using an existing user email
-def test_create_valid_user_update_data_with_existing_user_email(env_endpoint, test_context_users_teardown):
+def test_create_valid_user_update_data_with_existing_user_email(env_endpoint, test_context_users_teardown,request_headers):
 
     user_list = []
 

@@ -7,7 +7,7 @@ from tests.util.user_generator import generate_random_user
 import json
 
 # Test creating a new valid user and listing it at the end
-def test_create_valid_user(env_endpoint, test_context_users_teardown):
+def test_create_valid_user(env_endpoint, test_context_users_teardown,request_headers):
 
     user_list = []
 
@@ -26,7 +26,7 @@ def test_create_valid_user(env_endpoint, test_context_users_teardown):
     assert len(response.json()) == 1
 
 # Test creating a new duplicated user
-def test_create_duplicatd_user(env_endpoint, test_context_users_teardown):
+def test_create_duplicatd_user(env_endpoint, test_context_users_teardown,request_headers):
 
     user_list = []
 
@@ -57,7 +57,7 @@ def test_create_duplicatd_user(env_endpoint, test_context_users_teardown):
     assert len(response.json()) == 1
 
 # Test creating a new user with incomplete data ("name") in json body
-def test_create_user_incomplete_data_json_body_name(env_endpoint, test_context_users_teardown):
+def test_create_user_incomplete_data_json_body_name(env_endpoint, test_context_users_teardown,request_headers):
 
     
     body_data,json_body = generate_random_user()
@@ -68,13 +68,13 @@ def test_create_user_incomplete_data_json_body_name(env_endpoint, test_context_u
     test_context_users_teardown.append(body_data["email"])
     assert response.status_code == 400
 
-    response = requests.get(env_endpoint)    
+    response = requests.get(env_endpoint)
 
     assert response.status_code == 200
     assert len(response.json()) == 0
 
 # Test creating a new user with incomplete data ("age") in json body
-def test_create_user_incomplete_data_json_body_age(env_endpoint, test_context_users_teardown):
+def test_create_user_incomplete_data_json_body_age(env_endpoint, test_context_users_teardown,request_headers):
 
     
     body_data,json_body = generate_random_user()
@@ -110,7 +110,7 @@ def test_create_user_incomplete_data_json_body_email(env_endpoint):
     
 
 # Test creating a new user with invalid json body
-def test_create_user_invalid_json_body(env_endpoint, test_context_users_teardown):
+def test_create_user_invalid_json_body(env_endpoint, test_context_users_teardown,request_headers):
     
     malformed_payload = '{"email": "test@email"'
     

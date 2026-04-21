@@ -23,7 +23,7 @@ def test_list_unexisting_user(env_endpoint):
     assert response.json() == []
 
 # Test creating 3 different valid users, listing all 3 and getting 1 specific user.
-def test_list_all_users_successfully_3_different_users(env_endpoint,test_context_users_teardown):
+def test_list_all_users_successfully_3_different_users(env_endpoint,test_context_users_teardown,request_headers):
        
     user_list = []
 
